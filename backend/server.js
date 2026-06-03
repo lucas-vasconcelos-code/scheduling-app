@@ -3,8 +3,11 @@ import express from "express";
 import cors from "cors";
 import { google } from "googleapis";
 import dotenv from "dotenv";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 dotenv.config();
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const app = express();
 const PORT = 3000;
@@ -68,6 +71,148 @@ function getAuthedClient() {
 }
 
 // --- CALENDAR ROUTES ---
+const calendarTools = [
+  {
+    functionDeclarations: [
+      {
+        name: "create_event",
+        description: "Create a new event on the user's Google Calendar",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            title: { type: "STRING", description: "Title of the event" },
+            start: {
+              type: "STRING",
+              description: "Start time in ISO 8601 format",
+            },
+            end: { type: "STRING", description: "End time in ISO 8601 format" },
+          },
+          required: ["title", "start", "end"],
+        },
+      },
+      {
+        name: "delete_event",
+        description: "Delete an event from the user's Google Calendar",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            eventId: {
+              type: "STRING",
+              description: "The ID of the event to delete",
+            },
+          },
+          required: ["eventId"],
+        },
+      },
+      {
+        name: "update_event",
+        description: "Update an existing event on the user's Google Calendar",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            eventId: {
+              type: "STRING",
+              description: "The ID of the event to update",
+            },
+            title: { type: "STRING", description: "New title of the event" },
+            start: {
+              type: "STRING",
+              description: "New start time in ISO 8601 format",
+            },
+            end: {
+              type: "STRING",
+              description: "New end time in ISO 8601 format",
+            },
+          },
+          required: ["eventId", "title", "start", "end"],
+        },
+      },
+      {
+        name: "get_events",
+        description: "Get upcoming events from the user's Google Calendar",
+        parameters: {
+          type: "OBJECT",
+          properties: {},
+        },
+      },
+    ],
+  },
+];
+
+app.post("/ai", async (req, res) => {
+  try {
+    const { message } = req.body;
+    const auth = getAuthedClient();
+    const calendar = google.calendar({ version: "v3", auth });
+
+    const model = genAI.getGenerativeModel({
+      model: "gemini-3.5-flash",
+      tools: calendarTools,
+      systemInstruction: `You are a calendar assistant. Today is ${new Date().toISOString()}. If you see the keywords delete or remove, run the delete function.  
+        Always confirm with the user before deleting or updating events.`,
+    });
+
+    const result = await model.generateContent(
+      `Today is ${new Date().toISOString()}. User request: ${message}`
+    );
+
+    const response = result.response;
+    const candidate = response.candidates[0].content.parts[0];
+
+    // Check if Gemini wants to call a function
+    if (!candidate.functionCall) {
+      return res.json({ reply: candidate.text });
+    }
+
+    const { name, args } = candidate.functionCall;
+    let outcome;
+
+    console.log(`type: ${name}`);
+    console.log(`args: ${args}`);
+
+    if (name === "create_event") {
+      const r = await calendar.events.insert({
+        calendarId: "primary",
+        requestBody: {
+          summary: args.title,
+          start: { dateTime: args.start },
+          end: { dateTime: args.end },
+        },
+      });
+      outcome = r.data;
+    } else if (name === "delete_event") {
+      await calendar.events.delete({
+        calendarId: "primary",
+        eventId: args.eventId,
+      });
+      outcome = { deleted: true };
+    } else if (name === "update_event") {
+      const r = await calendar.events.update({
+        calendarId: "primary",
+        eventId: args.eventId,
+        requestBody: {
+          summary: args.title,
+          start: { dateTime: args.start },
+          end: { dateTime: args.end },
+        },
+      });
+      outcome = r.data;
+    } else if (name === "get_events") {
+      const r = await calendar.events.list({
+        calendarId: "primary",
+        timeMin: new Date().toISOString(),
+        maxResults: 10,
+        singleEvents: true,
+        orderBy: "startTime",
+      });
+      outcome = r.data.items;
+    }
+
+    res.json({ functionCalled: name, result: outcome });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // CREATE — POST /calendar/create
 // Expects: { title, start, end }

@@ -1,11 +1,20 @@
 import { useState } from "react";
 
+const SERVER_PORT = "http://localhost:3000";
+
 // The four actions a user can take
 type Action = "create" | "read" | "update" | "delete";
 
 function Home() {
   // Which action the user selected
   const [action, setAction] = useState<Action>("create");
+
+  // user's timezone
+  const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  console.log(userTimeZone);
+
+  // The user's prompt to ai
+  const [prompt, setPrompt] = useState("");
 
   // Fields for create / update
   const [title, setTitle] = useState("");
@@ -18,13 +27,29 @@ function Home() {
   // Store results/errors from the backend to show the user
   const [result, setResult] = useState<string>("");
 
+  async function submitPrompt() {
+    try {
+      let res = await fetch(SERVER_PORT + "/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: prompt + "The user's time zone is " + userTimeZone,
+        }),
+      });
+      const data = await res.json();
+      setResult(JSON.stringify(data, null, 2));
+    } catch (err: any) {
+      setResult(`Error: ${err.message}`);
+    }
+  }
+
   async function handleSubmit() {
     try {
       let res;
 
       if (action === "create") {
         // POST with event details in the body
-        res = await fetch("http://localhost:3000/calendar/create", {
+        res = await fetch(SERVER_PORT + "/calendar/create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ title, start, end }),
@@ -116,6 +141,18 @@ function Home() {
         Not authenticated?{" "}
         <a href="http://localhost:3000/auth/google">Sign in with Google</a>
       </p>
+      <h3>Test Prompt: Hang out with Coral today at 12</h3>
+
+      <div>
+        <input
+          type="text"
+          placeholder="Describe what you want"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+        />
+
+        <button onClick={submitPrompt}>{">"}</button>
+      </div>
     </div>
   );
 }
