@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 const SERVER_PORT = "http://localhost:3000";
 
@@ -6,12 +6,11 @@ const SERVER_PORT = "http://localhost:3000";
 type Action = "create" | "read" | "update" | "delete";
 
 function Home() {
-  // Which action the user selected
+  const [listening, setListening] = useState(false);
   const [action, setAction] = useState<Action>("create");
 
   // user's timezone
   const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  console.log(userTimeZone);
 
   // The user's prompt to ai
   const [prompt, setPrompt] = useState("");
@@ -27,17 +26,65 @@ function Home() {
   // Store results/errors from the backend to show the user
   const [result, setResult] = useState<string>("");
 
+  const recognitionRef = useRef<any>(null);
+
+  function toggleListening() {
+    if (listening) {
+      recognitionRef.current?.stop();
+      recognitionRef.current = null;
+      setListening(false);
+      return;
+    }
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported in this browser. Use Chrome.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.continuous = true;
+    recognition.interimResults = false;
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[event.results.length - 1][0].transcript;
+      setPrompt((prev) => prev + " " + transcript);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Speech error:", event.error);
+    };
+
+    // Restart automatically if it stops but user hasn't toggled off
+    recognition.onend = () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.start();
+      } else {
+        setListening(false);
+      }
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
+  }
+
   async function submitPrompt() {
     try {
-      let res = await fetch(SERVER_PORT + "/ai", {
+      const res = await fetch(SERVER_PORT + "/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: prompt + "The user's time zone is " + userTimeZone,
+          message: prompt + " The user's time zone is " + userTimeZone,
         }),
       });
       const data = await res.json();
       setResult(JSON.stringify(data, null, 2));
+      setPrompt(""); // clear after submit
     } catch (err: any) {
       setResult(`Error: ${err.message}`);
     }
@@ -48,25 +95,21 @@ function Home() {
       let res;
 
       if (action === "create") {
-        // POST with event details in the body
         res = await fetch(SERVER_PORT + "/calendar/create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ title, start, end }),
         });
       } else if (action === "read") {
-        // GET — no body needed, just fetch upcoming events
-        res = await fetch("http://localhost:3000/calendar/events");
+        res = await fetch(SERVER_PORT + "/calendar/events");
       } else if (action === "update") {
-        // PUT with the event id and new details
-        res = await fetch("http://localhost:3000/calendar/update", {
+        res = await fetch(SERVER_PORT + "/calendar/update", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ eventId, title, start, end }),
         });
       } else if (action === "delete") {
-        // DELETE with just the event id
-        res = await fetch("http://localhost:3000/calendar/delete", {
+        res = await fetch(SERVER_PORT + "/calendar/delete", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ eventId }),
@@ -74,8 +117,6 @@ function Home() {
       }
 
       const data = await res!.json();
-
-      // Pretty-print the response so it's readable
       setResult(JSON.stringify(data, null, 2));
     } catch (err: any) {
       setResult(`Error: ${err.message}`);
@@ -92,7 +133,6 @@ function Home() {
           <button
             key={a}
             onClick={() => setAction(a)}
-            // Highlight the currently selected action
             style={{ fontWeight: action === a ? "bold" : "normal" }}
           >
             {a}
@@ -108,7 +148,6 @@ function Home() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
-          {/* datetime-local gives a date+time picker in the browser */}
           <input
             type="datetime-local"
             value={start}
@@ -141,8 +180,8 @@ function Home() {
         Not authenticated?{" "}
         <a href="http://localhost:3000/auth/google">Sign in with Google</a>
       </p>
-      <h3>Test Prompt: Hang out with Coral today at 12</h3>
 
+      {/* AI prompt input with mic and submit buttons */}
       <div>
         <input
           type="text"
@@ -150,7 +189,7 @@ function Home() {
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
         />
-
+        <button onClick={toggleListening}>{listening ? "⏹ Stop" : "🎤"}</button>
         <button onClick={submitPrompt}>{">"}</button>
       </div>
     </div>

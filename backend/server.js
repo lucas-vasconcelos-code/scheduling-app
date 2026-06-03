@@ -4,6 +4,7 @@ import cors from "cors";
 import { google } from "googleapis";
 import dotenv from "dotenv";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { aiSystemInstructions } from "./ai-system-instructions.js";
 
 dotenv.config();
 
@@ -86,8 +87,12 @@ const calendarTools = [
               description: "Start time in ISO 8601 format",
             },
             end: { type: "STRING", description: "End time in ISO 8601 format" },
+            timeZone: {
+              type: "STRING",
+              description: "IANA timezone name e.g. America/New_York",
+            },
           },
-          required: ["title", "start", "end"],
+          required: ["title", "start", "end", "timeZone"],
         },
       },
       {
@@ -123,8 +128,12 @@ const calendarTools = [
               type: "STRING",
               description: "New end time in ISO 8601 format",
             },
+            timeZone: {
+              type: "STRING",
+              description: "IANA timezone name e.g. America/New_York",
+            },
           },
-          required: ["eventId", "title", "start", "end"],
+          required: ["eventId", "title", "start", "end", "timeZone"],
         },
       },
       {
@@ -146,15 +155,12 @@ app.post("/ai", async (req, res) => {
     const calendar = google.calendar({ version: "v3", auth });
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       tools: calendarTools,
-      systemInstruction: `You are a calendar assistant. Today is ${new Date().toISOString()}. If you see the keywords delete or remove, run the delete function.  
-        Always confirm with the user before deleting or updating events.`,
+      systemInstruction: `Today is ${new Date().toISOString()}. ${aiSystemInstructions}`,
     });
 
-    const result = await model.generateContent(
-      `Today is ${new Date().toISOString()}. User request: ${message}`
-    );
+    const result = await model.generateContent(`User request: ${message}`);
 
     const response = result.response;
     const candidate = response.candidates[0].content.parts[0];
@@ -175,8 +181,8 @@ app.post("/ai", async (req, res) => {
         calendarId: "primary",
         requestBody: {
           summary: args.title,
-          start: { dateTime: args.start },
-          end: { dateTime: args.end },
+          start: { dateTime: args.start, timeZone: args.timeZone },
+          end: { dateTime: args.end, timeZone: args.timeZone },
         },
       });
       outcome = r.data;
@@ -192,8 +198,8 @@ app.post("/ai", async (req, res) => {
         eventId: args.eventId,
         requestBody: {
           summary: args.title,
-          start: { dateTime: args.start },
-          end: { dateTime: args.end },
+          start: { dateTime: args.start, timeZone: args.timeZone },
+          end: { dateTime: args.end, timeZone: args.timeZone },
         },
       });
       outcome = r.data;
