@@ -1,10 +1,9 @@
 // ES module imports — keep everything as import, never mix with require()
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import { google } from "googleapis";
+import dotenv from "dotenv";
 
-// Load the .env file into process.env before anything else
 dotenv.config();
 
 const app = express();
@@ -24,6 +23,12 @@ const oauth2Client = new google.auth.OAuth2(
 
 // Store tokens in memory for now (in production use a database)
 let storedTokens = null;
+
+// Return sign in status
+app.get("/checkSignedIn", (req, res) => {
+  if (storedTokens != null) res.status(200).json({ message: "Is signed in" });
+  else res.status(400).json({ error: "User not signed in" });
+});
 
 // STEP 1: Send the user to Google's login page
 // Visit http://localhost:3000/auth/google in your browser to kick off login
@@ -159,6 +164,20 @@ app.delete("/calendar/delete", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+});
+
+console.log("Server object:", server.address());
+
+process.on("exit", (code) => {
+  console.log("Process exiting with code:", code);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception:", err);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection:", reason);
 });
