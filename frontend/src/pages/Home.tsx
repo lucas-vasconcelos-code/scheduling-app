@@ -6,7 +6,8 @@ const SERVER_PORT = "http://localhost:3000";
 type Action = "create" | "read" | "update" | "delete";
 
 function Home() {
-  const [listening, setListening] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const [action, setAction] = useState<Action>("create");
 
   // user's timezone
@@ -26,51 +27,82 @@ function Home() {
   // Store results/errors from the backend to show the user
   const [result, setResult] = useState<string>("");
 
-  const recognitionRef = useRef<any>(null);
+  // MediaRecorder refs — replacing the old SpeechRecognition refs
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
-  function toggleListening() {
-    if (listening) {
-      recognitionRef.current?.stop();
-      recognitionRef.current = null;
-      setListening(false);
+  async function toggleRecording() {
+    // --- STOP ---
+    if (recording) {
+      mediaRecorderRef.current?.stop();
+      // State is set to false inside the onstop handler below
       return;
     }
 
-    const SpeechRecognition =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      alert("Speech recognition is not supported in this browser. Use Chrome.");
+    // --- START ---
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err: any) {
+      alert(`Microphone access denied: ${err.message}`);
       return;
     }
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.continuous = true;
-    recognition.interimResults = false;
+    // Pick a supported MIME type; Safari uses mp4, everyone else webm
+    const mimeType = MediaRecorder.isTypeSupported("audio/webm")
+      ? "audio/webm"
+      : "audio/mp4";
 
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[event.results.length - 1][0].transcript;
-      setPrompt((prev) => prev + " " + transcript);
+    const mediaRecorder = new MediaRecorder(stream, { mimeType });
+    audioChunksRef.current = [];
+
+    mediaRecorder.ondataavailable = (e: BlobEvent) => {
+      if (e.data.size > 0) audioChunksRef.current.push(e.data);
     };
 
-    recognition.onerror = (event: any) => {
-      console.error("Speech error:", event.error);
-    };
+    mediaRecorder.onstop = async () => {
+      // Stop all mic tracks so the browser stops showing the recording indicator
+      stream.getTracks().forEach((t) => t.stop());
+      setRecording(false);
 
-    // Restart automatically if it stops but user hasn't toggled off
-    recognition.onend = () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.start();
-      } else {
-        setListening(false);
+      const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+
+      // Send to backend for whisper.cpp transcription
+      setTranscribing(true);
+      try {
+        const formData = new FormData();
+        // File extension hints the backend to rename correctly before whisper
+        const extension = mimeType.includes("mp4") ? "mp4" : "webm";
+        formData.append("audio", audioBlob, `recording.${extension}`);
+
+        const res = await fetch(SERVER_PORT + "/transcribe", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error ?? "Transcription failed");
+        }
+
+        const { transcript } = await res.json();
+        // Append transcript to the existing prompt, matching old SpeechRecognition behaviour
+        setPrompt((prev) => (prev ? prev + " " + transcript : transcript));
+      } catch (err: any) {
+        setResult(`Transcription error: ${err.message}`);
+      } finally {
+        setTranscribing(false);
       }
     };
 
-    recognitionRef.current = recognition;
-    recognition.start();
-    setListening(true);
+    mediaRecorder.onerror = (e: Event) => {
+      console.error("MediaRecorder error:", e);
+      setRecording(false);
+    };
+
+    mediaRecorderRef.current = mediaRecorder;
+    mediaRecorder.start();
+    setRecording(true);
   }
 
   async function submitPrompt() {
@@ -123,8 +155,15 @@ function Home() {
     }
   }
 
+  // Derive mic button label from state
+  const micLabel = transcribing
+    ? "⏳ Transcribing…"
+    : recording
+    ? "⏹ Stop"
+    : "🎤";
+
   return (
-    <div>
+    <div className="pageWrapper">
       <h1>My Scheduler</h1>
 
       {/* Let the user pick which action to perform */}
@@ -189,8 +228,12 @@ function Home() {
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
         />
-        <button onClick={toggleListening}>{listening ? "⏹ Stop" : "🎤"}</button>
-        <button onClick={submitPrompt}>{">"}</button>
+        <button onClick={toggleRecording} disabled={transcribing}>
+          {micLabel}
+        </button>
+        <button onClick={submitPrompt} disabled={recording || transcribing}>
+          {">"}
+        </button>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Dashboard from "./pages/Dashboard";
 import Home from "./pages/Home";
 import NotFound from "./pages/NotFound";
+import "./App.css";
 
 const SERVER_PORT = "http://localhost:3000";
 const SIGN_IN_PORT = "http://localhost:3000/auth/google";

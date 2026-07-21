@@ -10,5 +10,8 @@
   "author": "",
   "license": "ISC",
   "description": "",
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "multer": "^2.1.1"
+  }
 }
