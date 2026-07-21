@@ -12,6 +12,7 @@ function Home() {
 
   // user's timezone
   const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const userCurrDay = new Date();
 
   // The user's prompt to ai
   const [prompt, setPrompt] = useState("");
@@ -111,7 +112,12 @@ function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: prompt + " The user's time zone is " + userTimeZone,
+          message:
+            prompt +
+            " The user's time zone is " +
+            userTimeZone +
+            ". Today is " +
+            userCurrDay,
         }),
       });
       const data = await res.json();
