@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Aligned",
+    "slug": "aligned-scheduler",
+    "scheme": "aligned",
+    "version": "1.0.0",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "ios": {
+      "bundleIdentifier": "com.aligned.scheduler",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.aligned.scheduler"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "enableBackgroundRemoteNotifications": true
+        }
+      ],
+      "expo-speech-recognition",
+      "../../packages/alarms/app.plugin.cjs"
+    ]
+  }
+}

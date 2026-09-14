@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 
-const SERVER_PORT = "http://localhost:3000";
+import { api } from "../api";
 
 // The four actions a user can take
 type Action = "create" | "read" | "update" | "delete";
@@ -12,7 +12,7 @@ function Home() {
 
   // user's timezone
   const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const userCurrDay = new Date();
+
 
   // The user's prompt to ai
   const [prompt, setPrompt] = useState("");
@@ -27,6 +27,7 @@ function Home() {
 
   // Store results/errors from the backend to show the user
   const [result, setResult] = useState<string>("");
+  const [proposalId, setProposalId] = useState<string>();
 
   // MediaRecorder refs — replacing the old SpeechRecognition refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -76,7 +77,7 @@ function Home() {
         const extension = mimeType.includes("mp4") ? "mp4" : "webm";
         formData.append("audio", audioBlob, `recording.${extension}`);
 
-        const res = await fetch(SERVER_PORT + "/transcribe", {
+        const res = await api("/transcribe", {
           method: "POST",
           body: formData,
         });
@@ -108,20 +109,16 @@ function Home() {
 
   async function submitPrompt() {
     try {
-      const res = await fetch(SERVER_PORT + "/ai", {
+      const res = await api("/ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message:
-            prompt +
-            " The user's time zone is " +
-            userTimeZone +
-            ". Today is " +
-            userCurrDay,
+          message: prompt,
         }),
       });
       const data = await res.json();
       setResult(JSON.stringify(data, null, 2));
+      setProposalId(data.proposal?.status === "pending" ? data.proposal.id : undefined);
       setPrompt(""); // clear after submit
     } catch (err: any) {
       setResult(`Error: ${err.message}`);
@@ -133,21 +130,21 @@ function Home() {
       let res;
 
       if (action === "create") {
-        res = await fetch(SERVER_PORT + "/calendar/create", {
+        res = await api("/calendar/create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title, start, end }),
+          body: JSON.stringify({ title, start: new Date(start).toISOString(), end: new Date(end).toISOString(), timeZone: userTimeZone }),
         });
       } else if (action === "read") {
-        res = await fetch(SERVER_PORT + "/calendar/events");
+        res = await api("/calendar/events");
       } else if (action === "update") {
-        res = await fetch(SERVER_PORT + "/calendar/update", {
+        res = await api("/calendar/update", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ eventId, title, start, end }),
+          body: JSON.stringify({ eventId, title, start: new Date(start).toISOString(), end: new Date(end).toISOString() }),
         });
       } else if (action === "delete") {
-        res = await fetch(SERVER_PORT + "/calendar/delete", {
+        res = await api("/calendar/delete", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ eventId }),
@@ -156,6 +153,7 @@ function Home() {
 
       const data = await res!.json();
       setResult(JSON.stringify(data, null, 2));
+      setProposalId(data.proposal?.status === "pending" ? data.proposal.id : undefined);
     } catch (err: any) {
       setResult(`Error: ${err.message}`);
     }
@@ -171,6 +169,8 @@ function Home() {
   return (
     <div className="pageWrapper">
       <h1>My Scheduler</h1>
+      <p><a href="http://localhost:8081">Open Aligned’s new calendar</a></p>
+      {proposalId && <button onClick={async () => {const r=await api(`/api/v1/proposals/${proposalId}/apply`,{method:'POST'});setResult(JSON.stringify(await r.json(),null,2));if(r.ok)setProposalId(undefined);}}>Apply Changes</button>}
 
       {/* Let the user pick which action to perform */}
       <div>

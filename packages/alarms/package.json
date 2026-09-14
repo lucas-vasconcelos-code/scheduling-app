@@ -1,0 +1,9 @@
+{
+  "name": "@aligned/alarms",
+  "version": "1.0.0",
+  "main": "src/index.ts",
+  "peerDependencies": {
+    "expo": "*",
+    "react-native": "*"
+  }
+}

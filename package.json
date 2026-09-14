@@ -1,0 +1,59 @@
+{
+  "name": "aligned-scheduler",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "concurrently -k 'npm run dev -w @aligned/server' 'npm run web -w @aligned/client'",
+    "demo": "cross-env APP_MODE=demo npm run dev",
+    "typecheck": "tsc --noEmit -p tsconfig.json && npm run typecheck -w @aligned/client",
+    "lint": "eslint apps packages tests --no-warn-ignored",
+    "test": "vitest run",
+    "test:integration": "vitest run tests/integration.test.ts tests/cross-device.test.ts tests/google.test.ts tests/postgres.test.ts",
+    "test:e2e": "npm run build:server && playwright test",
+    "build": "npm run build:server && npm run build -w @aligned/client",
+    "db:generate": "prisma generate --schema apps/server/prisma/schema.prisma",
+    "db:migrate": "prisma migrate deploy --schema apps/server/prisma/schema.prisma",
+    "db:seed": "tsx apps/server/src/seed.ts",
+    "doctor": "npm exec -w @aligned/client -- expo-doctor",
+    "format": "prettier --write \"apps/**/*.{ts,tsx,json}\" \"packages/**/*.{ts,tsx,json}\" \"tests/**/*.ts\"",
+    "verify:visual": "node tests/visual.mjs",
+    "build:server": "node scripts/build-server.mjs",
+    "start:production": "sh scripts/start-production.sh",
+    "verify:production": "node scripts/verify-production.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@playwright/test": "^1.58.0",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/luxon": "^3.7.0",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^22.0.0",
+    "@types/supertest": "^6.0.3",
+    "concurrently": "^9.2.0",
+    "cross-env": "^10.1.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^9.39.0",
+    "prettier": "^3.8.1",
+    "prisma": "^6.19.0",
+    "supertest": "^7.2.0",
+    "tsx": "^4.21.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.57.0",
+    "vitest": "^3.2.4",
+    "zod": "^3.25.76"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.2",
+    "xcode": {
+      "uuid": "^11.1.1"
+    }
+  }
+}
