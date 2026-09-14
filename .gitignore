@@ -48,8 +48,23 @@ uploads/
 # Cache
 .cache/
 .eslintcache
+.expo/
+**/.expo/
+test-results/
+playwright-report/
+apps/client/ios/
+apps/client/android/
 
 # Package manager lockfiles (optional - usually commit ONE of these)
 # package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
+# Private deployment/build credentials
+.env.*
+!.env.example
+**/google-services.json
+**/GoogleService-Info.plist
+**/*service-account*.json
+
+# Local native build caches
+**/.gradle/

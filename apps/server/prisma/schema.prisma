@@ -1,0 +1,123 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+model User {
+  id String @id
+  googleSubject String? @unique
+  name String
+  revision Int @default(0)
+  settings Json
+  sync Json
+  createdAt DateTime @default(now())
+  sessions Session[]
+  connection GoogleConnection?
+  categories Category[]
+  events CalendarEventMetadata[]
+  preferences PreferenceRule[]
+  habits Habit[]
+  relationships HabitRelationship[]
+  deadlines Deadline[]
+  conversations Conversation[]
+  proposals ScheduleProposal[]
+  devices Device[]
+  operations OperationJournal[]
+}
+model Category {
+  id String
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data Json
+  updatedAt DateTime @updatedAt
+  @@id([userId, id])
+}
+model CalendarEventMetadata {
+  id String
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data Json
+  updatedAt DateTime @updatedAt
+  @@id([userId, id])
+}
+model PreferenceRule {
+  id String
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data Json
+  updatedAt DateTime @updatedAt
+  @@id([userId, id])
+}
+model Habit {
+  id String
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data Json
+  updatedAt DateTime @updatedAt
+  @@id([userId, id])
+}
+model HabitRelationship {
+  id String
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data Json
+  updatedAt DateTime @updatedAt
+  @@id([userId, id])
+}
+model Deadline {
+  id String
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data Json
+  updatedAt DateTime @updatedAt
+  @@id([userId, id])
+}
+model Conversation {
+  id String
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data Json
+  updatedAt DateTime @updatedAt
+  @@id([userId, id])
+}
+model ScheduleProposal {
+  id String
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data Json
+  updatedAt DateTime @updatedAt
+  @@id([userId, id])
+}
+model Device {
+  id String
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data Json
+  updatedAt DateTime @updatedAt
+  @@id([userId, id])
+}
+model Session {
+  tokenHash String @id
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  csrf String
+  expiresAt DateTime
+  @@index([userId])
+}
+model GoogleConnection {
+  userId String @id
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentials String
+  updatedAt DateTime @updatedAt
+}
+model OperationJournal {
+  id String
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status String
+  data Json
+  updatedAt DateTime @updatedAt
+  @@id([userId, id])
+}
