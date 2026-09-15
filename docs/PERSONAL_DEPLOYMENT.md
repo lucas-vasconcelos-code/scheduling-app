@@ -46,9 +46,9 @@ and [configuration as code](https://docs.railway.com/config-as-code/reference).
 
 ## PHASE B — Create PostgreSQL
 
-Choose **New → Postgres**, name the database `aligned`, select the same region as the service, and choose persistent storage and backups. In the database **Info / Connections** area copy the **Internal Database URL** privately into the web service's `DATABASE_URL` environment variable. Keep the database internal where supported. For another host, use its TLS-enabled connection string and restricted application role.
+Choose **New → Postgres**, name the database `aligned`, select the same region as the service, and choose persistent storage and backups. In the database **Info / Connections** area copy the pooled connection URL privately into `DATABASE_URL` and the matching direct, non-`-pooler` URL into `DIRECT_URL`. Keep the database internal where supported. For another host, use its TLS-enabled connection strings and restricted application role.
 
-The startup command applies committed migrations with `prisma migrate deploy`, then starts the server. Do not run `migrate dev` or reset a production database. The optional `npm run db:seed` is for development and is unnecessary for real Google users. Back up the database AND the encryption key separately. Restoring one without the other cannot restore Google authorization.
+The startup command applies committed migrations with `prisma migrate deploy`, then starts the server. Prisma migration advisory locks require the direct connection; using Neon’s pooler for `DATABASE_URL` during migrations causes `P1002` while acquiring `pg_advisory_lock`. Do not run `migrate dev` or reset a production database. The optional `npm run db:seed` is for development and is unnecessary for real Google users. Back up the database AND the encryption key separately. Restoring one without the other cannot restore Google authorization.
 
 See [Render PostgreSQL connections](https://render.com/docs/postgresql-creating-connecting).
 
@@ -85,7 +85,8 @@ Open the web service **Environment** page. Enter these values privately:
 | `PUBLIC_URL` | Actual HTTPS service origin |
 | `CLIENT_URL` | Same HTTPS origin |
 | `REDIRECT_URI` | Same origin + `/auth/callback` |
-| `DATABASE_URL` | Phase B private connection string |
+| `DATABASE_URL` | Phase B pooled connection string for runtime queries |
+| `DIRECT_URL` | Phase B direct, non-`-pooler` connection string for Prisma migrations |
 | `CLIENT_ID`, `CLIENT_SECRET` | Phase C web OAuth client |
 | `TOKEN_ENCRYPTION_KEY` | Output of local `openssl rand -base64 32` |
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | Phase D |

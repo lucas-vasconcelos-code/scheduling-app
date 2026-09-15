@@ -108,7 +108,18 @@ export async function api<T = any>(
         : "Cannot reach Aligned. Showing saved data; changes are not queued. Reconnect and try again.",
     );
   });
-  const value = await response.json();
+  const raw = await response.text();
+  let value: any;
+  try {
+    value = raw ? JSON.parse(raw) : {};
+  } catch {
+    throw new ApiError(
+      response.status,
+      response.ok
+        ? "Aligned returned an invalid response. Refresh and try again."
+        : `Aligned is unavailable (HTTP ${response.status}). Railway returned a gateway error; check the service logs.`,
+    );
+  }
   if (!response.ok)
     throw new ApiError(
       response.status,
