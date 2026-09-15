@@ -134,6 +134,16 @@ export function createApp(
     push.changed(id);
   };
   const syncQueue = new SyncQueue(repo, service, changed, (s) => cal.labels(s));
+  const rejectDuringSync: express.RequestHandler = (_req, _res, next) => {
+    if (syncQueue.isActive(_res.locals.userId))
+      return next(
+        new ServiceError(
+          409,
+          "Google Calendar is still synchronizing. Wait for the current import to finish, then try again.",
+        ),
+      );
+    next();
+  };
   app.disable("x-powered-by");
   app.set("trust proxy", 1);
   const allowedOrigins = [
@@ -682,6 +692,7 @@ export function createApp(
   });
   app.post(
     ["/api/v1/events", "/calendar/create"],
+    rejectDuringSync,
     mutate(async (req, res, s) => {
       if (
         req.body.categoryId &&

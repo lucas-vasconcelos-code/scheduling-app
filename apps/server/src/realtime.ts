@@ -96,6 +96,9 @@ export class SyncQueue {
     this.jobs.set(id, job);
     return job;
   }
+  isActive(id: string) {
+    return this.jobs.has(id);
+  }
   async close() {
     this.stopping = true;
     await Promise.allSettled(this.jobs.values());
