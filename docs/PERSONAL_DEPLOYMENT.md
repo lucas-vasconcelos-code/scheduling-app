@@ -19,6 +19,31 @@ Use a private untracked runtime env file. The Docker build excludes `.env` files
 
 See [Render web services](https://render.com/docs/web-services) and [Docker deployment](https://render.com/docs/docker).
 
+### Railway
+
+Deploy from the repository root (Railway Root Directory `/`). The committed
+`railway.json` selects `Dockerfile`, `npm run start:production`, and `/health`.
+Remove any old workspace-specific Start Command override and verify the effective
+deployment settings use these values. Use your Railway HTTPS domain in place of
+the Render origin throughout this guide. Keep one replica.
+
+The production script runs `npm run db:migrate` in Google mode before starting
+the server. A log beginning with `@aligned/server ... start` and `node dist/index.js`
+indicates the workspace start command is being used instead. That command skips
+migrations and uses a different working directory, so the default web export path
+also resolves incorrectly. The expected startup log includes `start:production`,
+`db:migrate`, and then `Aligned server`.
+
+If startup still fails, configuration errors identify the variable to check;
+database errors include a Prisma code (for example, `P2021` means a missing table).
+`TOKEN_ENCRYPTION_KEY` must decode from base64 to exactly 32 bytes. Preserve an
+existing valid key when redeploying. `ENABLE_DIAGNOSTICS` enables an authenticated
+API endpoint; it does not control startup logging. Never paste secret values into
+troubleshooting logs.
+
+See [Railway start commands](https://docs.railway.com/deployments/start-command)
+and [configuration as code](https://docs.railway.com/config-as-code/reference).
+
 ## PHASE B — Create PostgreSQL
 
 Choose **New → Postgres**, name the database `aligned`, select the same region as the service, and choose persistent storage and backups. In the database **Info / Connections** area copy the **Internal Database URL** privately into the web service's `DATABASE_URL` environment variable. Keep the database internal where supported. For another host, use its TLS-enabled connection string and restricted application role.

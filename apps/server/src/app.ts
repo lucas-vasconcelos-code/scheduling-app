@@ -52,6 +52,7 @@ import {
 import { SchedulingService, inputFor } from "./service.js";
 import { demoState, emptyState } from "./demo.js";
 import { transcribe } from "./transcribe.js";
+import { ConfigurationError } from "./startup-errors.js";
 export interface Config {
   demo: boolean;
   clientUrl: string;
@@ -84,16 +85,18 @@ export function createApp(
   intents?: IntentProvider,
   broker: ChangeBroker = new LocalChangeBroker(),
 ) {
-  if (
-    !config.demo &&
-    (!config.key ||
-      Buffer.from(config.key, "base64").length !== 32 ||
-      !config.clientId ||
-      !config.clientSecret)
-  )
-    throw new Error(
-      "Real mode requires CLIENT_ID, CLIENT_SECRET and a 32-byte TOKEN_ENCRYPTION_KEY.",
-    );
+  if (!config.demo) {
+    for (const [name, value] of Object.entries({
+      CLIENT_ID: config.clientId,
+      CLIENT_SECRET: config.clientSecret,
+      TOKEN_ENCRYPTION_KEY: config.key,
+    }))
+      if (!value) throw new ConfigurationError(`Google mode requires ${name}.`);
+    if (Buffer.from(config.key!, "base64").length !== 32)
+      throw new ConfigurationError(
+        "TOKEN_ENCRYPTION_KEY must decode from base64 to exactly 32 bytes.",
+      );
+  }
   const app = express(),
     cal: CalendarService =
       calendar ??

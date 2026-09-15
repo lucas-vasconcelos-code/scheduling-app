@@ -1,13 +1,14 @@
 import { resolve } from "node:path";
 import type { Config } from "./app.js";
+import { ConfigurationError } from "./startup-errors.js";
 export function environmentConfig(
   env: Record<string, string | undefined> = process.env,
 ): Config {
   const production = env.NODE_ENV === "production";
   if (env.APP_MODE && !["demo", "google"].includes(env.APP_MODE))
-    throw new Error("APP_MODE must be demo or google.");
+    throw new ConfigurationError("APP_MODE must be demo or google.");
   if (production && !env.APP_MODE)
-    throw new Error("Set APP_MODE explicitly in production.");
+    throw new ConfigurationError("Set APP_MODE explicitly in production.");
   const demo = env.APP_MODE !== "google";
   const publicUrl = env.PUBLIC_URL ?? "http://localhost:3000";
   const clientUrl =
@@ -22,39 +23,48 @@ export function environmentConfig(
     try {
       url = new URL(value);
     } catch {
-      throw new Error(`${name} must be a valid URL.`);
+      throw new ConfigurationError(`${name} must be a valid URL.`);
     }
     if (
       !["http:", "https:"].includes(url.protocol) ||
       (production && url.protocol !== "https:")
     )
-      throw new Error(
+      throw new ConfigurationError(
         `${name} must use ${production ? "HTTPS" : "HTTP or HTTPS"}.`,
       );
     if (url.username || url.password)
-      throw new Error(`${name} must not contain credentials.`);
+      throw new ConfigurationError(`${name} must not contain credentials.`);
   }
   if (
     production &&
     (new URL(clientUrl).origin !== new URL(publicUrl).origin ||
       new URL(redirectUri).origin !== new URL(publicUrl).origin)
   )
-    throw new Error(
+    throw new ConfigurationError(
       "Production web, API and Google callback must share PUBLIC_URL origin.",
     );
   if (!demo && !env.DATABASE_URL)
-    throw new Error("Google mode requires DATABASE_URL.");
-  if (
-    env.GOOGLE_WEBHOOK_URL &&
-    (new URL(env.GOOGLE_WEBHOOK_URL).protocol !== "https:" ||
-      new URL(env.GOOGLE_WEBHOOK_URL).pathname !== "/api/v1/google/webhook")
-  )
-    throw new Error(
-      "GOOGLE_WEBHOOK_URL must be HTTPS and end in /api/v1/google/webhook.",
-    );
+    throw new ConfigurationError("Google mode requires DATABASE_URL.");
+  if (env.GOOGLE_WEBHOOK_URL) {
+    let webhook: URL;
+    try {
+      webhook = new URL(env.GOOGLE_WEBHOOK_URL);
+    } catch {
+      throw new ConfigurationError("GOOGLE_WEBHOOK_URL must be a valid URL.");
+    }
+    if (
+      webhook.protocol !== "https:" ||
+      webhook.pathname !== "/api/v1/google/webhook"
+    )
+      throw new ConfigurationError(
+        "GOOGLE_WEBHOOK_URL must be HTTPS and end in /api/v1/google/webhook.",
+      );
+  }
   const port = Number(env.PORT ?? 3000);
   if (!Number.isInteger(port) || port < 1 || port > 65535)
-    throw new Error("PORT must be an integer between 1 and 65535.");
+    throw new ConfigurationError(
+      "PORT must be an integer between 1 and 65535.",
+    );
   return {
     demo,
     publicUrl: new URL(publicUrl).origin,

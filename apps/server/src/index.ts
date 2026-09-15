@@ -8,6 +8,7 @@ dotenv.config({
 import { createApp } from "./app.js";
 import { withUserLock, PostgresRepository } from "./store.js";
 import { environmentConfig } from "./config.js";
+import { startupErrorMessage } from "./startup-errors.js";
 async function main() {
   const config = environmentConfig();
   const demo = config.demo;
@@ -60,9 +61,7 @@ async function main() {
       });
     });
 }
-void main().catch(() => {
-  console.error(
-    "Aligned startup failed. Check server configuration, encryption key and database availability.",
-  );
+void main().catch((error: unknown) => {
+  console.error(startupErrorMessage(error));
   process.exit(1);
 });
