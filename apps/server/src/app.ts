@@ -619,19 +619,16 @@ export function createApp(
       res.json({ ok: true });
     }),
   );
-  app.post(
-    "/api/v1/sync",
-    mutate(async (_req, res, s) => {
-      // Full Google imports can expand many recurring events. Queue the work
-      // so the request is not held open until every instance is materialized.
-      void syncQueue.enqueue(s.userId);
-      res.status(202).json({
-        ok: true,
-        queued: true,
-        sync: { at: s.sync.at, error: s.sync.error, labels: s.sync.labels },
-      });
-    }),
-  );
+  app.post("/api/v1/sync", async (_req, res, next) => {
+    try {
+      // Do not acquire the per-user operation lock here. A full import may
+      // already hold it; the queue coalesces this request and runs it next.
+      void syncQueue.enqueue(res.locals.userId);
+      res.status(202).json({ ok: true, queued: true });
+    } catch (error) {
+      next(error);
+    }
+  });
   app.post(
     ["/api/v1/messages", "/ai"],
     mutate(async (req, res, s) => {
