@@ -133,7 +133,7 @@ export function createApp(
     broker.publish(id);
     push.changed(id);
   };
-  const syncQueue = new SyncQueue(repo, service, changed);
+  const syncQueue = new SyncQueue(repo, service, changed, (s) => cal.labels(s));
   app.disable("x-powered-by");
   app.set("trust proxy", 1);
   const allowedOrigins = [
@@ -622,10 +622,12 @@ export function createApp(
   app.post(
     "/api/v1/sync",
     mutate(async (_req, res, s) => {
-      await cal.labels(s);
-      await service.sync(s);
-      res.json({
+      // Full Google imports can expand many recurring events. Queue the work
+      // so the request is not held open until every instance is materialized.
+      void syncQueue.enqueue(s.userId);
+      res.status(202).json({
         ok: true,
+        queued: true,
         sync: { at: s.sync.at, error: s.sync.error, labels: s.sync.labels },
       });
     }),

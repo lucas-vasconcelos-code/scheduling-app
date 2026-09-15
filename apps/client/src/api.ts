@@ -91,11 +91,21 @@ export async function api<T = any>(
         : body instanceof FormData
           ? body
           : JSON.stringify(body),
+    // Google sync and recurring-event expansion happen asynchronously. Keep
+    // ordinary requests bounded while avoiding a misleading offline message
+    // for a long-running operation that is still being processed server-side.
     signal: AbortSignal.timeout(60000),
-  }).catch(() => {
+  }).catch((error: unknown) => {
+    const errorName =
+      error && typeof error === "object" && "name" in error
+        ? String(error.name)
+        : "";
+    const timedOut = errorName === "TimeoutError" || errorName === "AbortError";
     throw new ApiError(
       0,
-      "Cannot reach Aligned. Showing saved data; changes are not queued. Reconnect and try again.",
+      timedOut
+        ? "Aligned is still processing this request. Refresh in a moment to see the result."
+        : "Cannot reach Aligned. Showing saved data; changes are not queued. Reconnect and try again.",
     );
   });
   const value = await response.json();

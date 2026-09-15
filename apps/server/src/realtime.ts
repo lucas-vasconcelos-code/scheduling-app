@@ -55,6 +55,7 @@ export class SyncQueue {
     private repo: Repository,
     private service: SchedulingService,
     private changed: (id: string) => void,
+    private prepare?: (state: UserState) => Promise<void>,
   ) {}
   enqueue(id: string): Promise<void> {
     if (this.stopping) return Promise.resolve();
@@ -69,6 +70,7 @@ export class SyncQueue {
               before = stateFingerprint(s);
             if (!(await this.repo.credentials(id))) return;
             try {
+              await this.prepare?.(s);
               await this.service.sync(s);
             } catch (error) {
               if ((error as { status?: number }).status === 401) {
